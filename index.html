@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lung Breakout Game</title>
+<style>
+  body {
+    background-color: black; /* Set the background color of the whole page */
+    color: white; /* Set text color to white for visibility */
+    font-family: Arial, sans-serif; /* Most common font */
+  }
+
+  header {
+    text-align: center;
+    font-size: 24px;
+    font-weight: bold;
+    margin-top: 20px;
+  }
+  
+  canvas {
+    display: block;
+    margin: auto;
+    border: 1px solid #ffffff;
+  }
+</style>
+</head>
+<body>
+
+<header>Quit Smoking.</header> <!-- Header with bold text -->
+
+<canvas id="gameCanvas" width="480" height="620"></canvas>
+
+<script>
+// Get canvas element and context
+var canvas = document.getElementById("gameCanvas");
+var ctx = canvas.getContext("2d");
+
+// Smoking Quotes
+var smokingQuotes = [
+  "Smoking causes over 8 million deaths every year.",
+  "Smoking damages the lungs and can lead to lung cancer.",
+  "Smokers are at a higher risk for heart diseases.",
+  "Tobacco smoke contains over 7,000 chemicals, many of which are toxic."
+  // ... [add more quotes as needed, up to 10]
+];
+
+// Game variables
+var ballRadius = 5;
+var x = canvas.width / 2;
+var y = canvas.height - 30;
+var dx = 4;
+var dy = -4;
+var paddleHeight = 10;
+var paddleWidth = 75;
+var paddleX = (canvas.width - paddleWidth) / 2;
+var rightPressed = false;
+var leftPressed = false;
+
+// Bricks variables
+var brickRowCount = 25; // Increased row count for lung shape
+var brickColumnCount = 12; // Increased column count for lung shape
+var brickWidth = 30; // Smaller brick width for more detail
+var brickHeight = 10; // Smaller brick height for more detail
+var brickPadding = 5;
+var brickOffsetTop = 30;
+var brickOffsetLeft = 35;
+var animationFrameId;
+
+// Create bricks
+var bricks = [];
+for(var c=0; c<brickColumnCount; c++) {
+  bricks[c] = [];
+  for(var r=0; r<brickRowCount; r++) {
+    bricks[c][r] = { x: 0, y: 0, status: 0 }; // All bricks start as invisible
+  }
+}
+
+// Define the lung shape as a 2D array where 1s are bricks
+var lungShape = [
+[0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+  [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+  [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+  [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
+  [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+  [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+  [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0]
+];
+
+// Set brick status based on lung shape
+for(var c=0; c<brickColumnCount; c++) {
+  for(var r=0; r<brickRowCount; r++) {
+    if(lungShape[c][r] === 1) {
+      bricks[c][r].status = 1;
+    }
+  }
+}
+
+// Draw bricks
+function drawBricks() {
+  for(var c=0; c<brickColumnCount; c++) {
+    for(var r=0; r<brickRowCount; r++) {
+      if(bricks[c][r].status == 1) {
+        var brickX = (c*(brickWidth+brickPadding))+brickOffsetLeft;
+        var brickY = (r*(brickHeight+brickPadding))+brickOffsetTop;
+        bricks[c][r].x = brickX;
+        bricks[c][r].y = brickY;
+        ctx.beginPath();
+        ctx.rect(brickX, brickY, brickWidth, brickHeight);
+        ctx.fillStyle = "#db30b6";
+        ctx.fill();
+        ctx.closePath();
+      }
+    }
+  }
+}
+
+// Draw ball
+function drawBall() {
+  var smokeColors = ['#fff', '#eee', '#ddd']; // Shades of white and grey
+  var numberOfCircles = 5; // Number of circles to create the smoke effect
+
+  for (var i = 0; i < numberOfCircles; i++) {
+    var radius = ballRadius + Math.random() * 5; // Slightly vary the radius for a more natural look
+    var xOffset = (Math.random() - 0.5) * 5; // Random horizontal offset for dynamic smoke movement
+    var yOffset = (Math.random() - 0.5) * 5; // Random vertical offset for dynamic smoke movement
+
+    ctx.beginPath();
+    ctx.arc(x + xOffset, y + yOffset, radius, 0, Math.PI * 2);
+    ctx.fillStyle = smokeColors[Math.floor(Math.random() * smokeColors.length)];
+    ctx.globalAlpha = 0.5; // Semi-transparent
+    ctx.fill();
+    ctx.closePath();
+  }
+  ctx.globalAlpha = 1.0; // Reset alpha to opaque for other drawing elements
+}
+
+// Draw paddle as a cigarette
+function drawPaddle() {
+  var paddleYPosition = canvas.height - paddleHeight - 20; // Adjusted to raise the paddle above the bottom
+  ctx.beginPath();
+  ctx.rect(paddleX, paddleYPosition, paddleWidth, paddleHeight);
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.fillStyle = "orange";
+  ctx.fillRect(paddleX, paddleYPosition, paddleWidth * 0.2, paddleHeight);
+  ctx.closePath();
+}
+
+// Keydown event
+document.addEventListener("keydown", keyDownHandler, false);
+document.addEventListener("keyup", keyUpHandler, false);
+
+function keyDownHandler(e) {
+  if(e.key == "Right" || e.key == "ArrowRight") {
+    rightPressed = true;
+  }
+  else if(e.key == "Left" || e.key == "ArrowLeft") {
+    leftPressed = true;
+  }
+}
+
+// Keydown event
+document.addEventListener("keydown", keyDownHandler, false);
+document.addEventListener("keyup", keyUpHandler, false);
+
+function keyDownHandler(e) {
+  if(e.key == "Right" || e.key == "ArrowRight") {
+    rightPressed = true;
+  }
+  else if(e.key == "Left" || e.key == "ArrowLeft") {
+    leftPressed = true;
+  }
+}
+
+function keyUpHandler(e) {
+  if(e.key == "Right" || e.key == "ArrowRight") {
+    rightPressed = false;
+  }
+  else if(e.key == "Left" || e.key == "ArrowLeft") {
+    leftPressed = false;
+  }
+}
+
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawBricks();
+  drawBall();
+  drawPaddle();
+
+  // Check collision between ball and bricks
+  for(var c=0; c<brickColumnCount; c++) {
+    for(var r=0; r<brickRowCount; r++) {
+      var b = bricks[c][r];
+      // If brick is visible
+      if(b.status == 1) {
+        // Check if the ball hits the brick
+        if(x > b.x && x < b.x + brickWidth && y > b.y && y < b.y + brickHeight) {
+          dy = -dy; // Reverse the ball's y-direction
+          b.status = 0; // Set the brick to be invisible
+        }
+      }
+    }
+  }
+
+  // Bounce off the walls
+  if(x + dx > canvas.width-ballRadius || x + dx < ballRadius) {
+    dx = -dx;
+  }
+  if(y + dy < ballRadius) {
+    dy = -dy;
+  } else if(y + dy > canvas.height - paddleHeight - 20 - ballRadius) {
+    if(x > paddleX && x < paddleX + paddleWidth) {
+      dy = -dy * 1.1; // Optionally increase speed after hitting the paddle
+      dx = dx + (Math.random() - 0.5); // Slight variation in direction
+    } else {
+      gameOver();
+      return;
+    }
+  }
+
+  // Move paddle
+  if(rightPressed && paddleX < canvas.width-paddleWidth) {
+    paddleX += 7;
+  }
+  else if(leftPressed && paddleX > 0) {
+    paddleX -= 7;
+  }
+
+  // Move ball
+  x += dx;
+  y += dy;
+
+  animationFrameId = requestAnimationFrame(draw);
+}
+
+
+function randomizeBallDirection() {
+  var angle = Math.random() * Math.PI * 2;
+  dx = 4 * Math.cos(angle);
+  dy = 4 * Math.sin(angle);
+}
+
+function selectRandomQuote() {
+  var randomIndex = Math.floor(Math.random() * smokingQuotes.length);
+  return smokingQuotes[randomIndex];
+}
+
+function gameOver() {
+  document.getElementById('gameOverPopup').style.display = 'block';
+  document.getElementById('smokingStatistic').innerText = selectRandomQuote();
+  cancelAnimationFrame(animationFrameId);
+}
+
+function restartGame() {
+  document.getElementById('gameOverPopup').style.display = 'none';
+  document.location.reload();
+}
+
+randomizeBallDirection();
+draw();
+</script>
+
+<div id="gameOverPopup" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; color: black; padding: 20px; border-radius: 10px; text-align: center;">
+  <h2>Game Over</h2>
+  <p id="smokingStatistic">Smoking causes over 8 million deaths every year.</p>
+  <button onclick="restartGame()">Play Again</button>
+</div>
+</body>
+</html>
